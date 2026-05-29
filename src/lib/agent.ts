@@ -10,6 +10,7 @@ import { extractFeatures } from "../layers/features";
 import { paymentMiddleware } from "@x402/express";
 import { x402ResourceServer, HTTPFacilitatorClient } from "@x402/core/server";
 import { registerExactEvmScheme } from "@x402/evm/exact/server";
+import { getAuthHeaders } from "@coinbase/cdp-sdk/auth";
 
 const agent = await createAgent({
   name: process.env.AGENT_NAME ?? "distill",
@@ -23,8 +24,25 @@ const agent = await createAgent({
 const { app, addEntrypoint } = await createAgentApp(agent);
 
 // x402 ödeme duvarı — addEntrypoint'ten ÖNCE
+const CDP_HOST = "api.cdp.coinbase.com";
+const CDP_BASE = "/platform/v2/x402";
+const cdpKeyId = process.env.CDP_API_KEY_ID!;
+const cdpKeySecret = process.env.CDP_API_KEY_SECRET!;
+
 const facilitator = new HTTPFacilitatorClient({
-  url: process.env.PAYMENTS_FACILITATOR_URL ?? "https://www.x402.org/facilitator"
+  url: `https://${CDP_HOST}${CDP_BASE}`,
+  createAuthHeaders: async () => {
+    const [verify, settle, supported] = await Promise.all([
+      getAuthHeaders({ apiKeyId: cdpKeyId, apiKeySecret: cdpKeySecret, requestMethod: "POST", requestHost: CDP_HOST, requestPath: `${CDP_BASE}/verify` }),
+      getAuthHeaders({ apiKeyId: cdpKeyId, apiKeySecret: cdpKeySecret, requestMethod: "POST", requestHost: CDP_HOST, requestPath: `${CDP_BASE}/settle` }),
+      getAuthHeaders({ apiKeyId: cdpKeyId, apiKeySecret: cdpKeySecret, requestMethod: "GET",  requestHost: CDP_HOST, requestPath: `${CDP_BASE}/supported` }),
+    ]);
+    return {
+      verify:    { Authorization: verify.Authorization },
+      settle:    { Authorization: settle.Authorization },
+      supported: { Authorization: supported.Authorization },
+    };
+  },
 });
 const resourceServer = new x402ResourceServer(facilitator);
 registerExactEvmScheme(resourceServer);
@@ -34,7 +52,7 @@ app.use(paymentMiddleware({
     accepts: [{
       scheme: "exact",
       price: "$0.02",
-      network: "eip155:84532",
+      network: "eip155:8453",
       payTo: process.env.PAYMENTS_RECEIVABLE_ADDRESS as `0x${string}`,
     }],
     description: "Clean raw blockchain transaction data and filter bots",
