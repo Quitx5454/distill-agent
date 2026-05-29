@@ -23,8 +23,8 @@ const agent = await createAgent({
 const { app, addEntrypoint } = await createAgentApp(agent);
 
 // x402 ödeme duvarı — addEntrypoint'ten ÖNCE
-const facilitator = new HTTPFacilitatorClient({ 
-  url: process.env.PAYMENTS_FACILITATOR_URL ?? "https://facilitator.daydreams.systems" 
+const facilitator = new HTTPFacilitatorClient({
+  url: process.env.PAYMENTS_FACILITATOR_URL ?? "https://www.x402.org/facilitator"
 });
 const resourceServer = new x402ResourceServer(facilitator);
 registerExactEvmScheme(resourceServer);
@@ -34,7 +34,7 @@ app.use(paymentMiddleware({
     accepts: [{
       scheme: "exact",
       price: "$0.02",
-      network: "eip155:8453",
+      network: "eip155:84532",
       payTo: process.env.PAYMENTS_RECEIVABLE_ADDRESS as `0x${string}`,
     }],
     description: "Clean raw blockchain transaction data and filter bots",
