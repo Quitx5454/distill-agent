@@ -34,7 +34,7 @@ app.use(paymentMiddleware({
     accepts: [{
       scheme: "exact",
       price: "$0.02",
-      network: "eip155:8453",
+      network: "eip155:84532",
       payTo: process.env.PAYMENTS_RECEIVABLE_ADDRESS as `0x${string}`,
     }],
     description: "Clean raw blockchain transaction data and filter bots",
