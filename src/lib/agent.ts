@@ -3,7 +3,7 @@ import { createAgentApp } from "@lucid-agents/express";
 import { createAgent } from "@lucid-agents/core";
 import { http } from "@lucid-agents/http";
 import { payments, paymentsFromEnv } from "@lucid-agents/payments";
-import { wallets, walletsFromEnv } from "@lucid-agents/wallet";
+import { wallets } from "@lucid-agents/wallet";
 import { identity, identityFromEnv } from "@lucid-agents/identity";
 import { normalizeInput } from "../utils/flatten";
 import { defineSchema } from "../layers/schema";
@@ -21,17 +21,19 @@ const agent = await createAgent({
 })
   .use(http())
   .use(wallets({
-    config: {
-      ...walletsFromEnv(),
-      developer: {
+    config: (() => {
+      const pk = process.env.AGENT_WALLET_PRIVATE_KEY ?? process.env.DEVELOPER_WALLET_PRIVATE_KEY;
+      if (!pk) return undefined;
+      const walletCfg = {
         type: "local" as const,
-        privateKey: process.env.DEVELOPER_WALLET_PRIVATE_KEY!,
+        privateKey: pk.startsWith("0x") ? pk : `0x${pk}`,
         walletClient: {
-          rpcUrl: process.env.RPC_URL!,
+          rpcUrl: process.env.RPC_URL ?? "https://sepolia.base.org",
           chainId: parseInt(process.env.CHAIN_ID ?? "84532"),
         },
-      },
-    },
+      };
+      return { agent: walletCfg, developer: walletCfg };
+    })(),
   }))
   .use(payments({ config: paymentsFromEnv() }))
   .use(identity({ config: identityFromEnv() }))
