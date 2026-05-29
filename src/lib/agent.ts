@@ -3,6 +3,8 @@ import { createAgentApp } from "@lucid-agents/express";
 import { createAgent } from "@lucid-agents/core";
 import { http } from "@lucid-agents/http";
 import { payments, paymentsFromEnv } from "@lucid-agents/payments";
+import { wallets, walletsFromEnv } from "@lucid-agents/wallet";
+import { identity, identityFromEnv } from "@lucid-agents/identity";
 import { normalizeInput } from "../utils/flatten";
 import { defineSchema } from "../layers/schema";
 import { detectBots } from "../layers/botDetection";
@@ -18,7 +20,21 @@ const agent = await createAgent({
   description: process.env.AGENT_DESCRIPTION ?? "Cleans raw blockchain transaction data, filters bots, and returns structured output for AI agents",
 })
   .use(http())
+  .use(wallets({
+    config: {
+      ...walletsFromEnv(),
+      developer: {
+        type: "local" as const,
+        privateKey: process.env.DEVELOPER_WALLET_PRIVATE_KEY!,
+        walletClient: {
+          rpcUrl: process.env.RPC_URL!,
+          chainId: parseInt(process.env.CHAIN_ID ?? "84532"),
+        },
+      },
+    },
+  }))
   .use(payments({ config: paymentsFromEnv() }))
+  .use(identity({ config: identityFromEnv() }))
   .build();
 
 const { app, addEntrypoint } = await createAgentApp(agent);
