@@ -7,6 +7,9 @@ import { normalizeInput } from "../utils/flatten";
 import { defineSchema } from "../layers/schema";
 import { detectBots } from "../layers/botDetection";
 import { extractFeatures } from "../layers/features";
+import { paymentMiddleware } from "@x402/express";
+import { x402ResourceServer, HTTPFacilitatorClient } from "@x402/core/server";
+import { registerExactEvmScheme } from "@x402/evm/exact/server";
 
 const agent = await createAgent({
   name: process.env.AGENT_NAME ?? "distill",
@@ -18,6 +21,25 @@ const agent = await createAgent({
   .build();
 
 const { app, addEntrypoint } = await createAgentApp(agent);
+
+// x402 ödeme duvarı — addEntrypoint'ten ÖNCE
+const facilitator = new HTTPFacilitatorClient({ 
+  url: process.env.PAYMENTS_FACILITATOR_URL ?? "https://facilitator.daydreams.systems" 
+});
+const resourceServer = new x402ResourceServer(facilitator);
+registerExactEvmScheme(resourceServer);
+
+app.use(paymentMiddleware({
+  "/entrypoints/process/invoke": {
+    accepts: [{
+      scheme: "exact",
+      price: "$0.001",
+      network: "eip155:84532",
+      payTo: process.env.PAYMENTS_RECEIVABLE_ADDRESS as `0x${string}`,
+    }],
+    description: "Clean raw blockchain transaction data and filter bots",
+  },
+}, resourceServer));
 
 const inputSchema = z.object({
   data: z.unknown(),
