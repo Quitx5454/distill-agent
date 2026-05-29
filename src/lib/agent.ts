@@ -36,7 +36,21 @@ const agent = await createAgent({
     })(),
   }))
   .use(payments({ config: paymentsFromEnv() }))
-  .use(identity({ config: identityFromEnv() }))
+  .use(identity({
+    config: {
+      ...identityFromEnv(),
+      // ERC-8004 kayıt tamamlandı — trust config manuel geçiriliyor (wallet connector EIP-1559 bug bypass)
+      trust: process.env.AGENT_ID ? {
+        registrations: [{
+          agentId: process.env.AGENT_ID,
+          agentRegistry: `eip155:${process.env.CHAIN_ID ?? "84532"}:0x8004A818BFB912233c491871b3d84c89A494BD9e`,
+          agentAddress: `eip155:${process.env.CHAIN_ID ?? "84532"}:0x0D85F85B3556404553F0F3b3Ed1F08BCBF7B7951`,
+          agentURI: `https://${process.env.AGENT_DOMAIN}/.well-known/agent-registration.json`,
+        }],
+        trustModels: ["feedback", "inference-validation"],
+      } : undefined,
+    },
+  }))
   .build();
 
 const { app, addEntrypoint } = await createAgentApp(agent);
