@@ -33,7 +33,7 @@ app.use(paymentMiddleware({
   "/entrypoints/process/invoke": {
     accepts: [{
       scheme: "exact",
-      price: "$0.001",
+      price: "$0.02",
       network: "eip155:84532",
       payTo: process.env.PAYMENTS_RECEIVABLE_ADDRESS as `0x${string}`,
     }],
