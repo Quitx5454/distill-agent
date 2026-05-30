@@ -105,7 +105,7 @@ app.use((_req: any, res: any, next: any) => {
               maxTimeoutSeconds: a.maxTimeoutSeconds,
               resource: resourceUrl,
               description: resourceDesc,
-              mimeType: a.mimeType ?? null,
+              mimeType: a.mimeType ?? "",
               extra: a.extra,
               input: { method: "POST", type: "http", bodyType: "json" },
             })),
