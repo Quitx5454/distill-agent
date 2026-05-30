@@ -79,7 +79,8 @@ const facilitator = new HTTPFacilitatorClient({
 const resourceServer = new x402ResourceServer(facilitator);
 registerExactEvmScheme(resourceServer);
 
-// Decode PAYMENT-REQUIRED header into body for crawlers like xgate that don't read headers
+// Decode PAYMENT-REQUIRED header into body for crawlers like xgate
+// xgate expects: resource=string, accepts[].resource, accepts[].description, accepts[].maxAmountRequired
 app.use((_req: any, res: any, next: any) => {
   const origJson = res.json.bind(res);
   res.json = function (body: any) {
@@ -88,7 +89,28 @@ app.use((_req: any, res: any, next: any) => {
       if (header) {
         try {
           const decoded = JSON.parse(Buffer.from(header, "base64").toString("utf-8"));
-          return origJson(decoded);
+          const resourceUrl: string = typeof decoded.resource === "string"
+            ? decoded.resource
+            : decoded.resource?.url ?? "";
+          const resourceDesc: string = decoded.resource?.description ?? "";
+          const xgateBody = {
+            x402Version: decoded.x402Version,
+            resource: resourceUrl,
+            accepts: (decoded.accepts ?? []).map((a: any) => ({
+              scheme: a.scheme,
+              network: a.network,
+              asset: a.asset,
+              payTo: a.payTo,
+              maxAmountRequired: a.amount ?? a.maxAmountRequired,
+              maxTimeoutSeconds: a.maxTimeoutSeconds,
+              resource: resourceUrl,
+              description: resourceDesc,
+              mimeType: a.mimeType ?? null,
+              extra: a.extra,
+              input: { method: "POST", type: "http", bodyType: "json" },
+            })),
+          };
+          return origJson(xgateBody);
         } catch {}
       }
     }
