@@ -79,6 +79,24 @@ const facilitator = new HTTPFacilitatorClient({
 const resourceServer = new x402ResourceServer(facilitator);
 registerExactEvmScheme(resourceServer);
 
+// Decode PAYMENT-REQUIRED header into body for crawlers like xgate that don't read headers
+app.use((_req: any, res: any, next: any) => {
+  const origJson = res.json.bind(res);
+  res.json = function (body: any) {
+    if (res.statusCode === 402 && (!body || Object.keys(body).length === 0)) {
+      const header = (res.getHeader("PAYMENT-REQUIRED") ?? res.getHeader("payment-required")) as string | undefined;
+      if (header) {
+        try {
+          const decoded = JSON.parse(Buffer.from(header, "base64").toString("utf-8"));
+          return origJson(decoded);
+        } catch {}
+      }
+    }
+    return origJson(body);
+  };
+  next();
+});
+
 app.use(paymentMiddleware({
   "/entrypoints/process/invoke": {
     accepts: [{
