@@ -9,7 +9,6 @@ import { normalizeInput } from "../utils/flatten";
 import { defineSchema } from "../layers/schema";
 import { detectBots } from "../layers/botDetection";
 import { extractFeatures } from "../layers/features";
-import express from "express";
 import { paymentMiddleware } from "@x402/express";
 import { x402ResourceServer, HTTPFacilitatorClient } from "@x402/core/server";
 import { registerExactEvmScheme } from "@x402/evm/exact/server";
@@ -120,20 +119,16 @@ app.use((_req: any, res: any, next: any) => {
   next();
 });
 
-// Parse body early so we can inspect it before payment middleware
-app.use(express.json({ limit: "50mb" }));
-
-// Row limit check — BEFORE payment so users don't pay for oversized requests
+// Row limit pre-check BEFORE payment — reads Content-Length header only,
+// no stream consumption. Blocks clearly oversized requests (10k rows ≈ 2MB max).
+// The handler also enforces exact row count as a second line of defence.
 app.use("/entrypoints/process/invoke", (req: any, res: any, next: any) => {
-  const body = req.body;
-  const inputData = body?.input?.data ?? body?.data;
-  const rows = Array.isArray(inputData) ? inputData : null;
-  if (rows && rows.length > 10000) {
+  const contentLength = parseInt(req.headers["content-length"] ?? "0", 10);
+  if (contentLength > 3 * 1024 * 1024) {
     return res.status(413).json({
       error: "Payload too large",
-      message: `Input contains ${rows.length} rows. Maximum is 10,000 rows per request.`,
+      message: "Request body exceeds the 10,000 row limit (~3MB). Send fewer rows per request.",
       limit: 10000,
-      received: rows.length,
     });
   }
   next();
