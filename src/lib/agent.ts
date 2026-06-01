@@ -55,6 +55,17 @@ const agent = await createAgent({
 
 const { app, addEntrypoint } = await createAgentApp(agent);
 
+// CORS — must run before the payment middleware so browser clients can read
+// the x402 PAYMENT-REQUIRED header and so OPTIONS preflights bypass the paywall.
+app.use((req: any, res: any, next: any) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, PAYMENT-SIGNATURE, X-Payment");
+  res.header("Access-Control-Expose-Headers", "PAYMENT-REQUIRED, PAYMENT-RESPONSE, WWW-Authenticate");
+  if (req.method === "OPTIONS") return res.status(200).end();
+  next();
+});
+
 // x402 ödeme duvarı — addEntrypoint'ten ÖNCE
 const CDP_HOST = "api.cdp.coinbase.com";
 const CDP_BASE = "/platform/v2/x402";
