@@ -100,3 +100,8 @@ The envelope helpers live in `src/lib/envelope.ts` (`parseEnvelope`, `wrapRespon
 - Wire up `@lucid-agents/core` configuration and secrets (see `AGENTS.md` in the repo for details).
 - Update `.env` with your actual PRIVATE_KEY and configuration values.
 - Deploy with your preferred Bun-compatible platform when you're ready.
+
+
+## Part of Distill
+
+This agent is part of the **Distill** middleware suite. Use the Pipeline agent to chain multiple agents in one call: [Pipeline docs](https://quitx5454.github.io/pulse/docs/pipeline.html).
