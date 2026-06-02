@@ -5,10 +5,8 @@ import { http } from "@lucid-agents/http";
 import { payments, paymentsFromEnv } from "@lucid-agents/payments";
 import { wallets } from "@lucid-agents/wallet";
 import { identity, identityFromEnv } from "@lucid-agents/identity";
-import { normalizeInput } from "../utils/flatten";
-import { defineSchema } from "../layers/schema";
-import { detectBots } from "../layers/botDetection";
-import { extractFeatures } from "../layers/features";
+import { processDistill, type DistillInput } from "./process";
+import { parseEnvelope, wrapResponse, withEnvelope } from "./envelope";
 import { paymentMiddleware } from "@x402/express";
 import { x402ResourceServer, HTTPFacilitatorClient } from "@x402/core/server";
 import { registerExactEvmScheme } from "@x402/evm/exact/server";
@@ -156,43 +154,18 @@ const inputSchema = z.object({
 addEntrypoint({
   key: "process",
   description: "Clean raw blockchain transaction data, filter bots, and return structured output",
-  input: inputSchema,
+  // Accept either the Distill envelope ({ ..., payload: { data } }) or the
+  // legacy bare input ({ data }). The handler unwraps via parseEnvelope.
+  input: withEnvelope(inputSchema),
   handler: async (ctx) => {
-    const input = ctx.input as z.infer<typeof inputSchema>;
+    const { payload, sessionId, agentId } = parseEnvelope<DistillInput>(ctx.input);
 
-    let rawArray: unknown[];
-    if (Array.isArray(input.data)) {
-      rawArray = input.data;
-    } else if (
-      typeof input.data === 'object' &&
-      input.data !== null &&
-      Array.isArray((input.data as Record<string, unknown>)['data'])
-    ) {
-      rawArray = (input.data as Record<string, unknown>)['data'] as unknown[];
-    } else {
-      return { output: { error: "Invalid input: expected array or { data: [...] } format" } };
+    const result = await processDistill(payload);
+    if (!result.ok) {
+      return { output: wrapResponse({ error: result.error }, sessionId, agentId, "error") };
     }
 
-    const rows = normalizeInput(rawArray);
-
-    if (rows.length === 0) {
-      return { output: { error: "No rows found in input data" } };
-    }
-
-    if (rows.length > 10000) {
-      return { output: { error: "Too many rows. Maximum 10,000 rows per request." } };
-    }
-
-    const schemaResult = await defineSchema(rows);
-    if (!schemaResult.success) {
-      return { output: { error: schemaResult.error } };
-    }
-    const columns = schemaResult.columns;
-
-    const botResult = detectBots(rows, columns);
-    const output = extractFeatures(botResult, columns);
-
-    return { output };
+    return { output: wrapResponse(result.output, sessionId, agentId, "ok") };
   },
 });
 
