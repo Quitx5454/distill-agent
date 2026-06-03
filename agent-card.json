@@ -1,0 +1,77 @@
+{
+  "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+  "protocolVersion": "1.0",
+  "name": "Refine",
+  "description": "Strips bot and MEV activity from raw on-chain transaction data and returns structured, analysis-ready JSON for AI agents.",
+  "version": "1.0.0",
+  "url": "https://distill-agent-production.up.railway.app",
+  "provider": {
+    "organization": "Distill",
+    "url": "https://quitx5454.github.io/pulse"
+  },
+  "endpoints": [
+    {
+      "name": "invoke",
+      "url": "https://distill-agent-production.up.railway.app/entrypoints/process/invoke",
+      "method": "POST",
+      "protocolBinding": "HTTP+JSON"
+    }
+  ],
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false,
+    "stateTransitionHistory": false
+  },
+  "defaultInputModes": ["application/json"],
+  "defaultOutputModes": ["application/json"],
+  "skills": [
+    {
+      "id": "clean-transactions",
+      "name": "Clean On-Chain Transactions",
+      "description": "Strip bot/MEV activity from raw on-chain transaction data and return structured, analysis-ready JSON (summary, warnings, features, clean_data, suspicious_data).",
+      "tags": ["blockchain", "transactions", "bot-filtering", "data-cleaning", "base"],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"]
+    }
+  ],
+  "securitySchemes": {
+    "x402_commerce": {
+      "type": "apiKey",
+      "in": "header",
+      "name": "PAYMENT-SIGNATURE",
+      "description": "x402 micropayment signature settled on Base Mainnet via the Coinbase CDP facilitator."
+    }
+  },
+  "security": [{ "x402_commerce": [] }],
+  "registrations": [
+    {
+      "agentRegistry": "eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432"
+    }
+  ],
+  "extensions": {
+    "payment_required": {
+      "protocol": "x402",
+      "network": "eip155:8453",
+      "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "payTo": "0x104b5768FE505c400dd98F447665CB5c6fca388A",
+      "maxAmountRequired": "20000",
+      "price": "0.02 USDC"
+    },
+    "bazaar": {
+      "accepts": [
+        {
+          "scheme": "exact",
+          "network": "eip155:8453",
+          "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+          "payTo": "0x104b5768FE505c400dd98F447665CB5c6fca388A",
+          "maxAmountRequired": "20000",
+          "maxTimeoutSeconds": 60,
+          "resource": "https://distill-agent-production.up.railway.app/entrypoints/process/invoke",
+          "description": "Clean raw blockchain transaction data and filter bots.",
+          "mimeType": "application/json"
+        }
+      ]
+    }
+  },
+  "signatures": []
+}

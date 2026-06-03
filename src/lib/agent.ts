@@ -11,6 +11,7 @@ import { paymentMiddleware } from "@x402/express";
 import { x402ResourceServer, HTTPFacilitatorClient } from "@x402/core/server";
 import { registerExactEvmScheme } from "@x402/evm/exact/server";
 import { getAuthHeaders } from "@coinbase/cdp-sdk/auth";
+import agentCard from "../../agent-card.json";
 
 const agent = await createAgent({
   name: process.env.AGENT_NAME ?? "distill",
@@ -55,6 +56,13 @@ const { app, addEntrypoint } = await createAgentApp(agent);
 
 // NOTE: CORS is handled by the wrapper Express app in src/index.ts so it runs
 // before this agent app's x402 payment middleware (and OPTIONS preflights).
+
+// A2A Agent Card — public, static, no payment wall. Registered before the
+// paymentMiddleware below (which is scoped to the invoke path anyway) so this
+// route is always reachable without a PAYMENT-SIGNATURE.
+app.get("/.well-known/agent-card.json", (_req: any, res: any) => {
+  res.type("application/json").send(JSON.stringify(agentCard));
+});
 
 // x402 ödeme duvarı — addEntrypoint'ten ÖNCE
 const CDP_HOST = "api.cdp.coinbase.com";
