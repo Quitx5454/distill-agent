@@ -1,5 +1,6 @@
 import express from 'express';
 import { app as agentApp } from './lib/agent';
+import agentCard from '../agent-card.json';
 
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 
@@ -17,6 +18,14 @@ wrapper.use((req, res, next) => {
   if (req.method === "OPTIONS") return res.status(200).end();
   next();
 });
+
+// Public A2A Agent Card — static, no payment wall. Registered on the wrapper
+// BEFORE the agent app so it takes precedence over the manifest that Lucid's
+// createAgentApp() serves at this same path.
+wrapper.get('/.well-known/agent-card.json', (_req, res) => {
+  res.type('application/json').send(JSON.stringify(agentCard));
+});
+
 wrapper.use('/', agentApp);
 
 const server = wrapper.listen(port, () => {
