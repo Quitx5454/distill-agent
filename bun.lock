@@ -15,6 +15,7 @@
         "@x402/core": "^2.13.0",
         "@x402/evm": "^2.13.0",
         "@x402/express": "^2.13.0",
+        "@x402/extensions": "^2.13.0",
         "@x402/fetch": "^2.13.0",
         "express": "^4.19.2",
         "json-canonicalize": "^2.0.0",
