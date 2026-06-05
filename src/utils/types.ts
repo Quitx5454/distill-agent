@@ -67,6 +67,29 @@ export interface Features {
   recurringPatterns: string[];
 }
 
+// ── YENİ: Hybrid Cascade (v3 LightGBM) çıktısı ─────────────────────────────
+// Per-transaction ML scoring sonucu. Mevcut clean/suspicious/bot bölümlemesini
+// DEĞİŞTİRMEZ — tamamen ek (additive) metadata. `rows` girdideki satır sırasına
+// (normalizeInput sırası = girdi sırası) göre hizalıdır.
+export type ScoringMethod = "rule_only" | "cascade";
+
+export interface CascadeRowResult {
+  index: number;             // normalize edilmiş girdi satır indeksi
+  rule_score: number;        // existing_algo_score (0–1) — meta-feature / gate
+  ml_score: number | null;   // P(bot) 0–1, rule_only ise null
+  scoring_method: ScoringMethod;
+  is_bot: boolean;           // bu satır için cascade kararı
+}
+
+export interface CascadeOutput {
+  enabled: boolean;          // ML modeli yüklendi mi (false → her şey rule_only)
+  ml_threshold: number;      // BOT eşiği (P(bot) >=), 0.7
+  scoring_method_counts: { rule_only: number; cascade: number };
+  ml_bot_count: number;      // cascade ile BOT işaretlenen satır sayısı
+  ml_human_count: number;    // cascade ile HUMAN işaretlenen satır sayısı
+  rows: CascadeRowResult[];
+}
+
 // Final çıktı
 export interface DistillOutput {
   summary: {
@@ -80,4 +103,6 @@ export interface DistillOutput {
   features: Features;
   clean_data: RawRow[];
   suspicious_data: RawRow[];
+  // Hybrid cascade ML scoring (additive — mevcut alanlar değişmedi).
+  cascade?: CascadeOutput;
 }

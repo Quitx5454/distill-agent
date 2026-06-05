@@ -1,0 +1,55 @@
+{
+  "features": [
+    "gas_limit",
+    "gas_fee_ratio",
+    "value_wei",
+    "value_is_zero",
+    "value_round_number",
+    "calldata_length",
+    "calldata_is_empty",
+    "function_selector",
+    "calldata_entropy",
+    "tx_type",
+    "is_contract_creation",
+    "calldata_shannon_entropy",
+    "zero_byte_ratio",
+    "existing_algo_score"
+  ],
+  "recommended_threshold": 0.7,
+  "fpr_at_threshold": 0.0203,
+  "bot_recall_at_threshold": 0.9358,
+  "bot_precision_at_threshold": 0.9787,
+  "auc_roc": 0.994,
+  "training_approach": "ground_truth_cascade_lgbm",
+  "label_source": {
+    "bots": "layerzero_sybil (verified public sybil list, pulled from Base via Dune)",
+    "humans": "conservative behavioural proxy (low-freq / diverse / slow non-sybil Base senders)",
+    "note": "academic_bot_addresses.csv and academic_human_addresses.csv were EMPTY and unused"
+  },
+  "version": "3.0.0-ground-truth",
+  "model_file": "refine_bot_detector_cascade.json",
+  "model_format": "lightgbm-json",
+  "trained_on": "2026-06-05T15:46:00.181977+00:00",
+  "training_samples": 12776,
+  "ready_for_refine_integration": true,
+  "leakage_removed": [
+    "in_known_bot_list"
+  ],
+  "excluded_time_confounded_features": [
+    "gas_price",
+    "max_fee_per_gas",
+    "max_priority_fee_per_gas",
+    "priority_base_ratio"
+  ],
+  "known_limitations": [
+    "ground_truth_from_known_lists_only",
+    "novel_bot_types_may_be_missed",
+    "base_mainnet_only",
+    "human_class_is_a_behavioural_proxy_not_a_verified_list",
+    "label_time_window_mismatch (bots sampled over 365d, humans over 30d)",
+    "priority_base_ratio uses an approximated base fee (no per-block base fee in source data)",
+    "calldata_shannon_entropy duplicates calldata_entropy",
+    "zero_byte_ratio computed on the first 256 calldata bytes"
+  ],
+  "notes": "Stateless cascade detector trained on independent labels: verified LayerZero sybils as bots vs a conservative non-sybil human proxy. The '>2000 tx' heuristic is gone. in_known_bot_list is permanently excluded (leakage). Threshold fixed at 0.7 per spec."
+}
