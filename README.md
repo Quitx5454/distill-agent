@@ -13,12 +13,15 @@ The dev command runs `bun` in watch mode, starts the HTTP server, and reloads wh
 
 ### Project structure
 
-- `src/agent.ts` – defines your agent manifest and entrypoints.
+- `src/agent.ts` – defines the agent manifest and entrypoints.
 - `src/index.ts` – boots a Bun HTTP server with the agent.
+- `src/lib/process.ts` – core cleaning pipeline + hybrid cascade scoring.
+- `src/lib/ml-scorer.ts` – embedded v3 LightGBM cascade bot detector (manual tree traversal, zero external deps).
+- `models/` – `refine_bot_detector_cascade.json`, `feature_config_cascade.json`, `known_bots.bloom`.
 
-### Default entrypoints
+### Entrypoints
 
-- `echo` – Echo input text
+- `process` – clean raw blockchain transaction data, filter bots, and return structured features + per-tx cascade scores. `POST /entrypoints/process/invoke` (0.02 USDC, x402, Base Mainnet).
 
 ### Available scripts
 
@@ -26,6 +29,80 @@ The dev command runs `bun` in watch mode, starts the HTTP server, and reloads wh
 - `bun run start` – start the agent once.
 - `bun run agent` – run the agent module directly (helpful for quick experiments).
 - `bunx tsc --noEmit` – type-check the project.
+
+### Request Format
+
+The transaction array **must** be wrapped inside a `data` object. A bare array is rejected.
+
+✅ **Correct** — array wrapped in `data`:
+
+```json
+{
+  "data": [
+    {
+      "hash": "0x...",
+      "from": "0x...",
+      "to": "0x...",
+      "value": "500000000000000000",
+      "gas_limit": "150000",
+      "input": "0x7ff36ab5...",
+      "timestamp": 1716543215
+    }
+  ]
+}
+```
+
+❌ **Wrong** — a top-level array (`Invalid input: expected array or { data: [...] } format`):
+
+```json
+[
+  { "hash": "0x...", "from": "0x...", "to": "0x..." }
+]
+```
+
+Column names are flexible and auto-detected. Up to 10,000 rows per request. (You can also send this `data` object wrapped in the [Distill Standard Envelope](#distill-standard-envelope) under `payload` — see below.)
+
+### Hybrid Cascade Architecture
+
+Refine v3 layers an embedded **LightGBM** model on top of the existing rule-based detector. The rule score acts as a gate; only genuinely ambiguous transactions reach the ML model.
+
+- **Rule-based gate (instant):**
+  - `rule_score × 100 > 85` → **bot**, decided by the rule alone (no ML call).
+  - `rule_score × 100 < 15` → **human**, decided by the rule alone (no ML call).
+- **Gray zone (15–85):** the **LightGBM model decides on its own**. There is **no blending** with the rule score — in the gray zone the ML output is the sole decision maker, which avoids double-counting the rule signal.
+- **Embedded, zero external calls:** the model is loaded from `models/` and evaluated via manual tree traversal in `src/lib/ml-scorer.ts`. No network round-trips, microsecond-scale latency, zero new dependencies.
+- **Shadow mode:** the cascade is **purely additive**. It annotates every response with `ml_score` and `scoring_method` (and the rest of the fields below) but **does not change** the existing clean/suspicious/bot partitioning or any production decision yet. If the model file is missing, scoring transparently falls back to `rule_only`.
+
+#### Cascade output fields
+
+The cascade result is attached to the agent output under `cascade`, with a per-transaction entry (in input order) in `cascade.rows[]`:
+
+```json
+{
+  "cascade": {
+    "enabled": true,
+    "ml_threshold": 0.7,
+    "scoring_method_counts": { "rule_only": 1, "cascade": 1 },
+    "ml_bot_count": 1,
+    "ml_human_count": 1,
+    "rows": [
+      { "index": 0, "rule_score": 0.04, "ml_score": null, "scoring_method": "rule_only", "is_bot": false },
+      { "index": 1, "rule_score": 0.52, "ml_score": 0.83, "scoring_method": "cascade",  "is_bot": true  }
+    ]
+  }
+}
+```
+
+Per-row fields:
+
+| field            | type            | notes                                                                                  |
+| ---------------- | --------------- | -------------------------------------------------------------------------------------- |
+| `rule_score`     | float `0–1`     | rule-based bot probability. Multiply by 100 for the gate the 15 / 85 cutoffs apply to. |
+| `ml_score`       | float `0–1`     | LightGBM probability; `null` when `scoring_method` is `"rule_only"`.                    |
+| `scoring_method` | string          | `"rule_only"` (rule gate decided) or `"cascade"` (ML decided in the gray zone).         |
+| `is_bot`         | boolean         | final per-tx classification.                                                            |
+
+The cascade summary also carries `enabled` (whether the model loaded), `ml_threshold` (default `0.7`), `scoring_method_counts`, and `ml_bot_count` / `ml_human_count`.
 
 ### Distill Standard Envelope
 
@@ -76,7 +153,17 @@ Both input modes produce the same envelope response:
     "summary": { "total_transactions": 2, "bot_filtered": 0, "clean_transactions": 2 },
     "features": { "totalVolume": 1250, "cleanVolume": 1250 },
     "clean_data": [ "..." ],
-    "suspicious_data": []
+    "suspicious_data": [],
+    "cascade": {
+      "enabled": true,
+      "ml_threshold": 0.7,
+      "scoring_method_counts": { "rule_only": 2, "cascade": 0 },
+      "ml_bot_count": 0,
+      "ml_human_count": 2,
+      "rows": [
+        { "index": 0, "rule_score": 0.04, "ml_score": null, "scoring_method": "rule_only", "is_bot": false }
+      ]
+    }
   },
   "processed_at": "2026-06-02T16:21:11.827Z"
 }
